@@ -13,6 +13,7 @@ class MoviePartyClient {
     this.isMenuActive = false;
     this.currentMenu = null;
     this.isInitialSync = false;
+    this.justJoinedRoom = false;
   }
 
   async connect() {
@@ -39,13 +40,19 @@ class MoviePartyClient {
 
     this.socket.on('playback-update', (data) => {
       if (data.isSync && this.isInitialSync) {
-        this.isInitialSync = false; 
+        this.isInitialSync = false;
+        setTimeout(() => {
+          this.roomMenu();
+        }, 100);
       } else if (data.isSync) {
         console.log(`Video synced to ${data.timestamp}s`);
       } else {
         console.log(`${data.username} ${data.action} at ${data.timestamp}s`);
       }
-      this.showCurrentMenu();
+      
+      if (!(data.isSync && this.isInitialSync)) {
+        this.showCurrentMenu();
+      }
     });
 
     this.socket.on('user-joined', (data) => {
@@ -64,14 +71,16 @@ class MoviePartyClient {
       console.log(`Room "${data.roomId}" created successfully!`);
       console.log(`Video state: ${data.videoState.playing ? 'Playing' : 'Paused'} at ${data.videoState.timestamp}s`);
       this.showRoomHistory(data);
+      this.justJoinedRoom = true;
       this.roomMenu();
     });
 
     this.socket.on('room-joined', (data) => {
       console.log(`Joined room "${data.roomId}" successfully!`);
       this.showRoomHistory(data);
-    
+      
       this.isInitialSync = true;
+      this.justJoinedRoom = true;
       
       if (data.videoState.lastAction !== 'sync') {
         this.socket.emit('video-control', {
@@ -80,16 +89,22 @@ class MoviePartyClient {
           timestamp: data.videoState.timestamp,
           username: this.username
         });
+      } else {
+        setTimeout(() => {
+          this.roomMenu();
+        }, 100);
       }
-      
-      this.roomMenu();
     });
 
     this.socket.on('room-error', (data) => {
       console.log(`Error: ${data.message}`);
-      this.currentRoom = null; 
+      
       setTimeout(() => {
-        this.showMainMenu();
+        if (this.currentRoom) {
+          this.roomMenu();
+        } else {
+          this.showMainMenu();
+        }
       }, 100);
     });
 
@@ -111,6 +126,11 @@ class MoviePartyClient {
   }
 
   showCurrentMenu() {
+    if (this.justJoinedRoom) {
+      this.justJoinedRoom = false;
+      return;
+    }
+    
     if (this.isMenuActive && this.currentMenu) {
       process.stdout.write('\n');
       this.currentMenu();
@@ -182,6 +202,7 @@ class MoviePartyClient {
   roomMenu() {
     this.isMenuActive = true;
     this.currentMenu = this.roomMenu.bind(this);
+    this.justJoinedRoom = false;
     
     console.log(`\n=== Room: ${this.currentRoom} ===`);
     console.log('1. Send message');
@@ -268,7 +289,7 @@ class MoviePartyClient {
       });
 
       console.log(`Sent: ${videoAction}`);
-      this.roomMenu();
+
     });
   }
 
@@ -279,7 +300,8 @@ class MoviePartyClient {
     }
     this.isMenuActive = false;
     this.currentMenu = null;
-    this.isInitialSync = false; 
+    this.isInitialSync = false;
+    this.justJoinedRoom = false;
     console.log('Left the room');
     this.showMainMenu();
   }
