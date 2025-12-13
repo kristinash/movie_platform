@@ -1,0 +1,6 @@
+ {
+    "name": "movie",
+    "type": "module",
+    "main": "server.js",
+    "dependencies": {"express":"5.1.0", "cors": "2.8.5", "socket.io":"4.8.1"}
+ }
