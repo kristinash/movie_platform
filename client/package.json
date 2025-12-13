@@ -1,0 +1,6 @@
+ {
+    "name": "movie",
+    "type": "module",
+    "main": "clent.js",
+    "dependencies": {"inquirer": "13.0.1", "socket.io-client":"4.8.1"}
+ }
