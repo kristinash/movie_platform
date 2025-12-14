@@ -98,7 +98,10 @@ class MoviePartyClient {
 
     this.socket.on('room-error', (data) => {
       console.log(`Error: ${data.message}`);
-      
+
+       if (data.message.includes('Room does not exist')) {
+        this.currentRoom = null;
+      }
       setTimeout(() => {
         if (this.currentRoom) {
           this.roomMenu();
