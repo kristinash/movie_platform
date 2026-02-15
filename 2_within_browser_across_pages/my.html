@@ -1,0 +1,41 @@
+<body>
+<video id="rem" controls></video>
+    <script>
+        const rem = document.querySelector("video#rem");
+        let peerConnection;
+        const channel = new BroadcastChannel("stream-video");
+        let pendingCandidates = [];
+        channel.onmessage = async (e) => {
+            if (e.data.type === "icecandidate") {
+                if (peerConnection && peerConnection.remoteDescription) {
+                    peerConnection.addIceCandidate(e.data.candidate);
+                } else {
+                    pendingCandidates.push(e.data.candidate);
+                }
+            } else if (e.data.type === "offer") {
+                
+                console.log("received offer");
+                handleOffer(e.data);
+            }
+        }
+        async function handleOffer(offer) {
+            peerConnection = new RTCPeerConnection();
+            peerConnection.addEventListener("track", e => rem.srcObject = e.streams[0]);
+            peerConnection.addEventListener("icecandidate", e => {
+                if (e.candidate) {
+                    channel.postMessage({ 
+                    type: "icecandidate", 
+                    candidate: e.candidate? e.candidate.toJSON(): null
+                });
+                }  
+            }); 
+            await peerConnection.setRemoteDescription(offer);
+            pendingCandidates.forEach(cand => peerConnection.addIceCandidate(cand));
+            pendingCandidates = [];
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            console.log("Sending answer...");
+            channel.postMessage(answer);    
+        }
+    </script>
+</body>

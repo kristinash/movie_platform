@@ -1,0 +1,59 @@
+<body>
+  <input type="file" id="videoLoader" accept="video/*">
+  <video id="player" controls autoplay style="display:none; width: 400px;"></video>
+  <button id="stream" onclick="startStreaming(this)" >stream</button>
+  <script>
+    videoLoader.onchange = function() {
+      const file = this.files[0];
+      if (file) {
+        player.src = URL.createObjectURL(file);
+        player.style.display = 'block';
+      }
+    };
+    const local = document.querySelector("video#player");
+    let peerConnection;
+    const channel = new BroadcastChannel("stream-video");
+    let pendingCandidates = [];
+    channel.onmessage = async (e) => {
+            if (e.data.type === "icecandidate") {
+                if (peerConnection && peerConnection.remoteDescription) {
+                    peerConnection.addIceCandidate(e.data.candidate);
+                } else {
+                    pendingCandidates.push(e.data.candidate);
+                }
+            } else if (e.data.type === "answer") {
+                console.log("received answer");
+                await peerConnection?.setRemoteDescription(e.data)
+            }
+        }
+
+    async function startStreaming (e) {
+      e.disabled=true;
+      peerConnection = new RTCPeerConnection();
+      peerConnection.addEventListener("icecandidate", e => {
+      if (e.candidate) {
+            channel.postMessage({ 
+            type: "icecandidate", 
+            candidate: e.candidate? e.candidate.toJSON(): null
+        });
+        }  
+    });
+    
+      const stream = player.captureStream ? player.captureStream() : player.mozCaptureStream();
+      stream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, stream);
+      });    
+      pendingCandidates.forEach(cand=>peerConnection.addIceCandidate(cand));
+      pendingCandidates = [];
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      console.log("Created offer, sending...");
+      channel.postMessage(offer);
+    }
+  </script>
+</body>
+
+
+
+
+
